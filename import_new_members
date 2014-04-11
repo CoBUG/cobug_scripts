@@ -1,0 +1,175 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Env qw($MYSQL_U $MYSQL_P);
+use MIME::Lite;
+use DBI;
+
+my $sql = qq~
+	select
+		*
+	from
+		user_queue
+~;
+
+my $ds = "DBI:mysql:database=cobug_xmpp;host=localhost;port=3306";
+my $dbh = DBI->connect($ds, $MYSQL_U, $MYSQL_P);
+
+my $sth = $dbh->prepare($sql);
+$sth->execute;
+
+sub sendEmail {
+	my ($u, $pass) = @_;
+	my $msg = MIME::Lite->new(
+		From    => 'admin@cobug.org',
+		To      => $u->{email},
+		Subject => 'CoBUG XMPP Account Info',
+		Type    => 'multipart/mixed'
+	);
+
+	$msg->attach(
+		Type     => 'TEXT',
+		Data     => qq~
+Your CoBUG XMPP account has been created!
+
+Jabber ID: $u->{username}\@cobug.org
+Password: $pass
+
+Configure instructions for Pidgin:
+
+  1. Click 'Accounts' in the man menu.
+  2. Click 'Manage Accounts'.
+  3. Then click 'Add'.
+  4. Select XMPP from the 'Protocol' list.
+  5. Set 'Username' to '$u->{username}'.
+  6. Set 'Domain' to 'cobug.org'.
+  7. Type in the above password and click 'Add'.
+
+Joining the Multi User Chat:
+
+  1. Click 'Buddies', then 'Join Chat'.
+  2. Make sure you have your '$u->{username}\@cobug.org' account selected.
+  3. Set 'Room' to 'discussion'.
+  4. Set 'Server' to 'conference.cobug.org'.
+  5. Click 'Join'!
+
+Changing your XMPP password (RECOMMENDED):
+
+  1. In Pidgin select 'Accounts'.
+  2. Click the name of your account ($u->{username}\@cobug.org).
+  3. Click 'Change Password'.
+
+If you have further questions, please email them to admin\@cobug.org!
+~
+	);
+
+	$msg->send('smtp','localhost');
+}
+
+sub addMember {
+	my $u = shift;
+	my $asql = qq~
+		insert into members (
+			fname,
+			lname,
+			email,
+			username,
+			has_xmpp,
+			reminders,
+			co_native
+		) values (
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?
+		)
+	~;
+	my $asth = $dbh->prepare($asql);
+	$asth->execute(
+		$u->{fname},
+		$u->{lname},
+		$u->{email},
+		$u->{username},
+		$u->{has_xmpp},
+		$u->{reminders},
+		$u->{co_native}
+	);
+
+	print "$u->{email} added to the memebers list.\n";
+}
+
+sub addUser {
+	my $u = shift;
+	my @a = split("\n", `apg`);
+	my $pass = $a[0];
+	my $asql = qq~
+		insert into users (
+			username,
+			password
+		) values (
+			?,
+			?
+		)
+	~;
+	if ($u->{has_xmpp}) {
+		my $asth = $dbh->prepare($asql);
+		$asth->execute($u->{username}, $pass);
+		print "$u->{email} added to active users in XMPP.\n";
+		sendEmail($u, $pass);
+	}
+
+	if ($u->{reminders}) {
+		`/usr/local/bin/mlmmj-sub -a $u->{email} -L /var/spool/mlmmj/announce/`;
+		print "$u->{email} subscribed to announce@\n";
+	}
+
+	addMember($u);
+	deleteTmpU($u);
+}
+
+sub deleteTmpU {
+	my $u = shift;
+	my $dsql = qq~
+		delete from
+			user_queue
+		where
+			email = ? and
+			username = ?
+	~;
+
+	my $dsth = $dbh->prepare($dsql);
+	$dsth->execute($u->{email}, $u->{username});
+	print "$u->{email} removed from the queue.\n";
+}
+
+while (my $row = $sth->fetchrow_hashref()) {
+	my $str = qq~
+$row->{email}
+\t$row->{fname} $row->{lname}
+\t$row->{username}
+\tWants XMPP: $row->{has_xmpp}
+\tWants Sub: $row->{reminders}
+\tCo Native: $row->{co_native}
+~;
+	print $str;
+	print "Add? (y/n)\n";
+	my $resp = <>;
+	if ($resp =~ m/yes|y/i) {
+		print "adding $row->{email}\n";
+		addUser($row);
+	} else {
+		print "Purge entry?\n";
+		my $purge = <>;
+		if ($purge =~ m/yes|y/i) {
+			deleteTmpU($row);
+		}
+	}
+}
+
+$sth->finish();
+
+$dbh->disconnect();
