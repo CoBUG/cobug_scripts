@@ -38,7 +38,7 @@ Password: $pass
 
 Configure instructions for Pidgin:
 
-  1. Click 'Accounts' in the man menu.
+  1. Click 'Accounts' in the main menu.
   2. Click 'Manage Accounts'.
   3. Then click 'Add'.
   4. Select XMPP from the 'Protocol' list.
