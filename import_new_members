@@ -123,7 +123,7 @@ sub addUser {
 	}
 
 	if ($u->{reminders}) {
-		`/usr/local/bin/mlmmj-sub -a $u->{email} -L /var/spool/mlmmj/announce/`;
+		`/usr/local/bin/mlmmj-sub -c -a $u->{email} -L /var/spool/mlmmj/announce/`;
 		print "$u->{email} subscribed to announce@\n";
 	}
 
