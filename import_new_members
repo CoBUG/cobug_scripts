@@ -59,6 +59,15 @@ Changing your XMPP password (RECOMMENDED):
   1. In Pidgin select 'Accounts'.
   2. Click the name of your account ($u->{username}\@cobug.org).
   3. Click 'Change Password'.
+  
+Configure instructions for irssi:
+
+  1. Install the irssi-xmpp plugin (e.g. "pkg_add irssi-xmpp" on OpenBSD).
+  2. After starting irssi, run: /load xmpp
+  3. Connect to the cobug.org XMPP server:
+     /xmppconnect -host cobug.org JABBER_ID PASSWORD
+  4. To join the Multi User Chat:
+     /j discussion\@conference.cobug.org
 
 If you have further questions, please email them to admin\@cobug.org!
 ~
